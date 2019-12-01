@@ -1,9 +1,17 @@
-//snap/bin/zig build-exe 01/one.zig --output-dir 01/ --name .one && time 01/one "$@"; exit
-
 const std = @import("std");
 const fmt = @import("std").fmt;
+const File = std.fs.File;
 
 pub fn main() !void {
-    const stdout_file = try std.io.getStdOut();
-    try stdout_file.write("Hello, world!\n");
+    const input = try File.openRead("01/input.txt");
+    defer input.close();
+
+    var strm = input.inStream().stream;
+    var buffer: []u8 = undefined;
+    while (strm.readUntilDelimiterOrEof(buffer, '\n')) {
+        try stdout.write(buffer);
+        try stdout.write("\n");
+    }
+
+    std.debug.warn("Done.\n");
 }
