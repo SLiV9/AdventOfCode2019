@@ -2,8 +2,8 @@ const std = @import("std");
 const fmt = @import("std").fmt;
 const File = std.fs.File;
 
-fn load_program(program: *[1000]u32) !usize {
-    const input = try File.openRead("02/input.txt");
+fn load_program(program: *[1000]u32, filename: []const u8) !usize {
+    const input = try File.openRead(filename);
     defer input.close();
 
     const strm = &input.inStream().stream;
@@ -32,12 +32,65 @@ fn print_program(program: []u32) void {
     }
 }
 
+const ProgramError = error{
+    UnknownOpcode,
+    OutOfBounds,
+    OutOfProgram,
+};
+
+fn execute_op(pg: []u32, pos: usize) !bool {
+    switch (pg[pos]) {
+        1 => {
+            try check_op_bounds(pg, pos);
+            pg[pg[pos + 3]] = pg[pg[pos + 1]] + pg[pg[pos + 2]];
+        },
+        2 => {
+            try check_op_bounds(pg, pos);
+            pg[pg[pos + 3]] = pg[pg[pos + 1]] * pg[pg[pos + 2]];
+        },
+        99 => {
+            return true;
+        },
+        else => {
+            return ProgramError.UnknownOpcode;
+        },
+    }
+    return false;
+}
+
+fn check_op_bounds(pg: []u32, pos: usize) !void {
+    if (pos + 3 >= pg.len) {
+        return ProgramError.OutOfBounds;
+    } else if (pg[pos + 1] >= pg.len) {
+        return ProgramError.OutOfBounds;
+    } else if (pg[pos + 2] >= pg.len) {
+        return ProgramError.OutOfBounds;
+    } else if (pg[pos + 3] >= pg.len) {
+        return ProgramError.OutOfBounds;
+    }
+}
+
+fn execute_program(pg: []u32) !void {
+    var pos: usize = 0;
+    while (pos < pg.len) {
+        const stop: bool = try execute_op(pg, pos);
+        if (stop) {
+            return;
+        }
+        pos += 4;
+    }
+    return ProgramError.OutOfProgram;
+}
+
 pub fn main() !void {
     var program = [_]u32{0} ** 1000;
-    const len: usize = try load_program(&program);
+    const len: usize = try load_program(&program, "02/input-one.txt");
 
-    program[1] = 12;
-    program[2] = 02;
+    print_program(program[0..len]);
+
+    try execute_program(program[0..len]);
+
+    std.debug.warn("\n");
 
     print_program(program[0..len]);
 
