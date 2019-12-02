@@ -70,12 +70,12 @@ fn check_op_bounds(pg: []u32, pos: usize) !void {
     }
 }
 
-fn execute_program(pg: []u32) !void {
+fn execute_program(pg: []u32) !u32 {
     var pos: usize = 0;
     while (pos < pg.len) {
         const stop: bool = try execute_op(pg, pos);
         if (stop) {
-            return;
+            return pg[0];
         }
         pos += 4;
     }
@@ -95,17 +95,23 @@ pub fn main() !void {
             memory[1] = noun;
             memory[2] = verb;
             for (program[3..len]) |x, i| {
-                memory[i] = x;
+                memory[3 + i] = x;
             }
-            try execute_program(memory[0..len]);
-            var result: u32 = memory[0];
-            if (result == 19690720) {
-                std.debug.warn("\nFound {} {}\n", noun, verb);
-                return;
+            if (execute_program(memory[0..len])) |result| {
+                if (result == 19690720) {
+                    std.debug.warn("\nFound {} {}\n", noun, verb);
+                    return;
+                } else if (noun == 12 and verb == 2) {
+                    std.debug.warn("\n1202 => {}\n", result);
+                }
+            } else |err| {
+                // Ignore.
             }
             verb += 1;
+            std.debug.warn("\r{}% ({}%)", noun, verb);
         }
         noun += 1;
+        std.debug.warn("\n{}%\n", noun);
     }
 
     std.debug.warn("All posibilities exhausted, no solution found.\n");
