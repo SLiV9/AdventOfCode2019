@@ -69,9 +69,10 @@ fn paint(cell: *u8, color: u8) bool {
             cell.* = color;
             return false;
         },
-        '-', '|', '+' => {
-            cell.* = 'X';
-            return true;
+        'A'...'Z' => {
+            var cross: bool = (cell.* != color);
+            cell.* = color;
+            return cross;
         },
         else => {
             std.debug.warn("unknown cell color {c}\n", cell.*);
@@ -168,6 +169,7 @@ pub fn main() !void {
 
     var solution: u32 = w * h;
 
+    var color: u8 = 'A';
     for (snakes) |snake| {
         var r: u32 = cy;
         var c: u32 = cx;
@@ -177,7 +179,6 @@ pub fn main() !void {
                     var rr = r - @intCast(u16, move.dis);
                     while (r > rr) {
                         r -= 1;
-                        var color: u8 = if (r == rr) '+' else '|';
                         if (paint(&grid[r * w + c], color)) {
                             check(c, r, cx, cy, &solution);
                         }
@@ -187,7 +188,6 @@ pub fn main() !void {
                     var cc = c - @intCast(u16, move.dis);
                     while (c > cc) {
                         c -= 1;
-                        var color: u8 = if (c == cc) '+' else '-';
                         if (paint(&grid[r * w + c], color)) {
                             check(c, r, cx, cy, &solution);
                         }
@@ -197,7 +197,6 @@ pub fn main() !void {
                     var cc = c + @intCast(u16, move.dis);
                     while (c < cc) {
                         c += 1;
-                        var color: u8 = if (c == cc) '+' else '-';
                         if (paint(&grid[r * w + c], color)) {
                             check(c, r, cx, cy, &solution);
                         }
@@ -207,7 +206,6 @@ pub fn main() !void {
                     var rr = r + @intCast(u16, move.dis);
                     while (r < rr) {
                         r += 1;
-                        var color: u8 = if (r == rr) '+' else '|';
                         if (paint(&grid[r * w + c], color)) {
                             check(c, r, cx, cy, &solution);
                         }
@@ -216,13 +214,14 @@ pub fn main() !void {
                 else => std.debug.assert(false),
             }
         }
+        color += 1;
     }
 
-    if (w < 240 and h < 200) {
+    if (w < 300 and h < 200) {
         var r: u32 = 0;
         while (r < h) {
             var c: u32 = 0;
-            while (c < w) {
+            while (c < w and c < 230) {
                 std.debug.warn("{c}", grid[r * w + c]);
                 c += 1;
             }
