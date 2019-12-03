@@ -66,7 +66,7 @@ fn enact_move(move: Move, x: *i32, y: *i32) void {
 pub fn main() !void {
     var xxx: [10][1000]Move = undefined;
     var yyy: [10][]Move = undefined;
-    const snakes = try parse_snakes("03/input.txt", &xxx, &yyy);
+    const snakes = try parse_snakes("03/sample1.txt", &xxx, &yyy);
 
     for (snakes) |snake| {
         for (snake) |move| {
@@ -100,12 +100,34 @@ pub fn main() !void {
         }
     }
 
-    const cx = 1 - x0;
-    const cy = 1 - y0;
-    const w = x1 - x0 + 3;
-    const h = y1 - y0 + 3;
+    const cx = @intCast(u32, 1 - x0);
+    const cy = @intCast(u32, 1 - y0);
+    const w = @intCast(u32, x1 - x0 + 3);
+    const h = @intCast(u32, y1 - y0 + 3);
 
     std.debug.warn("cx = {}, cy = {}, w = {}, h = {}", cx, cy, w, h);
+
+    var grid: [16000][16000]u8 = undefined;
+    if (false) {
+        var r: u32 = 0;
+        while (r < h) {
+            var c: u32 = 0;
+            while (c < w) {
+                if (r == 0 or r == h - 1 or c == 0 or c == w - 1) {
+                    grid[r][c] = '.';
+                } else {
+                    grid[r][c] = ' ';
+                }
+                c += 1;
+            }
+            r += 1;
+        }
+    }
+    if (false and w < 100 and h < 100) {
+        for (grid) |row| {
+            std.debug.warn("{s}\n", row);
+        }
+    }
 
     std.debug.warn("\nDone.\n");
 }
