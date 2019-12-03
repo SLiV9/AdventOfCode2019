@@ -64,6 +64,11 @@ fn enact_move(move: Move, x: *i32, y: *i32) void {
 }
 
 pub fn main() !void {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+
+    const allocator = &arena.allocator;
+
     var xxx: [10][1000]Move = undefined;
     var yyy: [10][]Move = undefined;
     const snakes = try parse_snakes("03/sample1.txt", &xxx, &yyy);
@@ -105,27 +110,36 @@ pub fn main() !void {
     const w = @intCast(u32, x1 - x0 + 3);
     const h = @intCast(u32, y1 - y0 + 3);
 
-    std.debug.warn("cx = {}, cy = {}, w = {}, h = {}", cx, cy, w, h);
+    std.debug.warn("cx = {}, cy = {}, w = {}, h = {}\n", cx, cy, w, h);
 
-    var grid: [16000][16000]u8 = undefined;
-    if (false) {
+    var grid: []u8 = try allocator.alloc(u8, h * w);
+    {
         var r: u32 = 0;
         while (r < h) {
             var c: u32 = 0;
             while (c < w) {
                 if (r == 0 or r == h - 1 or c == 0 or c == w - 1) {
-                    grid[r][c] = '.';
+                    grid[r * w + c] = '.';
+                } else if (r == cy and c == cx) {
+                    grid[r * w + c] = 'o';
                 } else {
-                    grid[r][c] = ' ';
+                    grid[r * w + c] = ' ';
                 }
                 c += 1;
             }
             r += 1;
         }
     }
-    if (false and w < 100 and h < 100) {
-        for (grid) |row| {
-            std.debug.warn("{s}\n", row);
+    if (w < 100 and h < 100) {
+        var r: u32 = 0;
+        while (r < h) {
+            var c: u32 = 0;
+            while (c < w) {
+                std.debug.warn("{c}", grid[r * w + c]);
+                c += 1;
+            }
+            std.debug.warn("\n");
+            r += 1;
         }
     }
 
