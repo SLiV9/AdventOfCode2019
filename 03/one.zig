@@ -45,7 +45,7 @@ fn parse_snakes(filename: []const u8, buffer: *[10][1000]Move, snakes: *[10][]Mo
     return snakes[0..len];
 }
 
-fn enact_move(move: Move, x: *i32, y: *i32) void {
+fn jump_move(move: Move, x: *i32, y: *i32) void {
     switch (move.way) {
         'U' => {
             y.* -= move.dis;
@@ -60,6 +60,41 @@ fn enact_move(move: Move, x: *i32, y: *i32) void {
             y.* += move.dis;
         },
         else => std.debug.assert(false),
+    }
+}
+
+fn paint(cell: *u8, color: u8) bool {
+    switch (cell.*) {
+        ' ' => {
+            cell.* = color;
+            return false;
+        },
+        '-', '|', '+' => {
+            cell.* = 'X';
+            return true;
+        },
+        else => {
+            std.debug.warn("unknown cell color {c}\n", cell.*);
+            std.debug.assert(false);
+            return false;
+        },
+    }
+}
+
+fn absdiff(a: u32, b: u32) u32 {
+    if (a > b) {
+        return a - b;
+    } else {
+        return b - a;
+    }
+}
+
+fn check(x: u32, y: u32, cx: u32, cy: u32, solution: *u32) void {
+    var dx = absdiff(x, cx);
+    var dy = absdiff(y, cy);
+    var d = dx + dy;
+    if (d < solution.*) {
+        solution.* = d;
     }
 }
 
@@ -89,7 +124,7 @@ pub fn main() !void {
         var x: i32 = 0;
         var y: i32 = 0;
         for (snake) |move| {
-            enact_move(move, &x, &y);
+            jump_move(move, &x, &y);
             if (x < x0) {
                 x0 = x;
             }
@@ -130,6 +165,59 @@ pub fn main() !void {
             r += 1;
         }
     }
+
+    var solution: u32 = w * h;
+
+    for (snakes) |snake| {
+        var r: u32 = cy;
+        var c: u32 = cx;
+        for (snake) |move| {
+            switch (move.way) {
+                'U' => {
+                    var rr = r - @intCast(u16, move.dis);
+                    while (r > rr) {
+                        r -= 1;
+                        var color: u8 = if (r == rr) '+' else '|';
+                        if (paint(&grid[r * w + c], color)) {
+                            check(c, r, cx, cy, &solution);
+                        }
+                    }
+                },
+                'L' => {
+                    var cc = c - @intCast(u16, move.dis);
+                    while (c > cc) {
+                        c -= 1;
+                        var color: u8 = if (c == cc) '+' else '-';
+                        if (paint(&grid[r * w + c], color)) {
+                            check(c, r, cx, cy, &solution);
+                        }
+                    }
+                },
+                'R' => {
+                    var cc = c + @intCast(u16, move.dis);
+                    while (c < cc) {
+                        c += 1;
+                        var color: u8 = if (c == cc) '+' else '-';
+                        if (paint(&grid[r * w + c], color)) {
+                            check(c, r, cx, cy, &solution);
+                        }
+                    }
+                },
+                'D' => {
+                    var rr = r + @intCast(u16, move.dis);
+                    while (r < rr) {
+                        r += 1;
+                        var color: u8 = if (r == rr) '+' else '|';
+                        if (paint(&grid[r * w + c], color)) {
+                            check(c, r, cx, cy, &solution);
+                        }
+                    }
+                },
+                else => std.debug.assert(false),
+            }
+        }
+    }
+
     if (w < 100 and h < 100) {
         var r: u32 = 0;
         while (r < h) {
@@ -143,5 +231,7 @@ pub fn main() !void {
         }
     }
 
-    std.debug.warn("\nDone.\n");
+    std.debug.warn("\n");
+    std.debug.assert(solution < w * h);
+    std.debug.warn("Solution: {}.\n", solution);
 }
