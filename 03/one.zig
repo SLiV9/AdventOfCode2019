@@ -4,7 +4,7 @@ const File = std.fs.File;
 
 const Move = struct {
     way: u8,
-    dis: u32,
+    dis: i32,
 };
 
 fn parse_snake(line: []u8, snake: *[1000]Move) ![]Move {
@@ -15,7 +15,7 @@ fn parse_snake(line: []u8, snake: *[1000]Move) ![]Move {
         std.debug.assert(len < snake.len);
         snake[len] = Move{
             .way = str[0],
-            .dis = try fmt.parseInt(u32, str[1..], 10),
+            .dis = try fmt.parseInt(i32, str[1..], 10),
         };
         len += 1;
     }
@@ -24,13 +24,13 @@ fn parse_snake(line: []u8, snake: *[1000]Move) ![]Move {
 }
 
 fn parse_snakes(filename: []const u8, buffer: *[10][1000]Move, snakes: *[10][]Move) ![][]Move {
-    const input = try File.openRead("03/sample1.txt");
+    const input = try File.openRead(filename);
     defer input.close();
 
     var len: usize = 0;
 
     var istrm = &input.inStream().stream;
-    var linebuffer: [1000]u8 = undefined;
+    var linebuffer: [12000]u8 = undefined;
     while (true) {
         var mb_line = try istrm.readUntilDelimiterOrEof(linebuffer[0..], '\n');
         if (mb_line) |line| {
@@ -45,10 +45,28 @@ fn parse_snakes(filename: []const u8, buffer: *[10][1000]Move, snakes: *[10][]Mo
     return snakes[0..len];
 }
 
+fn enact_move(move: Move, x: *i32, y: *i32) void {
+    switch (move.way) {
+        'U' => {
+            y.* -= move.dis;
+        },
+        'L' => {
+            x.* -= move.dis;
+        },
+        'R' => {
+            x.* += move.dis;
+        },
+        'D' => {
+            y.* += move.dis;
+        },
+        else => std.debug.assert(false),
+    }
+}
+
 pub fn main() !void {
     var xxx: [10][1000]Move = undefined;
     var yyy: [10][]Move = undefined;
-    const snakes = try parse_snakes("03/sample1.txt", &xxx, &yyy);
+    const snakes = try parse_snakes("03/input.txt", &xxx, &yyy);
 
     for (snakes) |snake| {
         for (snake) |move| {
@@ -56,6 +74,38 @@ pub fn main() !void {
         }
         std.debug.warn(" ({})\n", snake.len);
     }
+
+    var x0: i32 = 0;
+    var x1: i32 = 0;
+    var y0: i32 = 0;
+    var y1: i32 = 0;
+
+    for (snakes) |snake| {
+        var x: i32 = 0;
+        var y: i32 = 0;
+        for (snake) |move| {
+            enact_move(move, &x, &y);
+            if (x < x0) {
+                x0 = x;
+            }
+            if (x > x1) {
+                x1 = x;
+            }
+            if (y < y0) {
+                y0 = y;
+            }
+            if (y > y1) {
+                y1 = y;
+            }
+        }
+    }
+
+    const cx = 1 - x0;
+    const cy = 1 - y0;
+    const w = x1 - x0 + 3;
+    const h = y1 - y0 + 3;
+
+    std.debug.warn("cx = {}, cy = {}, w = {}, h = {}", cx, cy, w, h);
 
     std.debug.warn("\nDone.\n");
 }
