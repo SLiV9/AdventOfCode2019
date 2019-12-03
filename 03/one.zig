@@ -106,7 +106,7 @@ pub fn main() !void {
 
     var xxx: [10][1000]Move = undefined;
     var yyy: [10][]Move = undefined;
-    const snakes = try parse_snakes("03/sample1.txt", &xxx, &yyy);
+    const snakes = try parse_snakes("03/input.txt", &xxx, &yyy);
 
     for (snakes) |snake| {
         for (snake) |move| {
@@ -218,7 +218,7 @@ pub fn main() !void {
         }
     }
 
-    if (w < 100 and h < 100) {
+    if (w < 240 and h < 200) {
         var r: u32 = 0;
         while (r < h) {
             var c: u32 = 0;
