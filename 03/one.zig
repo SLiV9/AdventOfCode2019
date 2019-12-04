@@ -45,24 +45,6 @@ fn parse_snakes(filename: []const u8, buffer: *[10][1000]Move, snakes: *[10][]Mo
     return snakes[0..len];
 }
 
-fn jump_move(move: Move, x: *i32, y: *i32) void {
-    switch (move.way) {
-        'U' => {
-            y.* -= move.dis;
-        },
-        'L' => {
-            x.* -= move.dis;
-        },
-        'R' => {
-            x.* += move.dis;
-        },
-        'D' => {
-            y.* += move.dis;
-        },
-        else => std.debug.assert(false),
-    }
-}
-
 fn paint(cell: *u8, color: u8) bool {
     switch (cell.*) {
         ' ' => {
@@ -120,7 +102,7 @@ pub fn main() !void {
 
     var xxx: [10][1000]Move = undefined;
     var yyy: [10][]Move = undefined;
-    const snakes = try parse_snakes("03/input.txt", &xxx, &yyy);
+    const snakes = try parse_snakes("03/sample1.txt", &xxx, &yyy);
 
     for (snakes) |snake| {
         for (snake) |move| {
@@ -129,27 +111,66 @@ pub fn main() !void {
         std.debug.warn(" ({})\n", snake.len);
     }
 
+    var hori_x0s: [10][1000]i32 = undefined;
+    var hori_x1s: [10][1000]i32 = undefined;
+    var hori_ys: [10][1000]i32 = undefined;
+    var hori_len: [10]usize = undefined;
+    var vert_y0s: [10][1000]i32 = undefined;
+    var vert_y1s: [10][1000]i32 = undefined;
+    var vert_xs: [10][1000]i32 = undefined;
+    var vert_len: [10]usize = undefined;
+
     var x0: i32 = 0;
     var x1: i32 = 0;
     var y0: i32 = 0;
     var y1: i32 = 0;
 
-    for (snakes) |snake| {
+    for (snakes) |snake, i| {
         var x: i32 = 0;
         var y: i32 = 0;
         for (snake) |move| {
-            jump_move(move, &x, &y);
-            if (x < x0) {
-                x0 = x;
-            }
-            if (x > x1) {
-                x1 = x;
-            }
-            if (y < y0) {
-                y0 = y;
-            }
-            if (y > y1) {
-                y1 = y;
+            switch (move.way) {
+                'U' => {
+                    vert_xs[i][vert_len[i]] = x;
+                    vert_y1s[i][vert_len[i]] = y;
+                    y -= move.dis;
+                    vert_y0s[i][vert_len[i]] = y;
+                    vert_len[i] += 1;
+                    if (y < y0) {
+                        y0 = y;
+                    }
+                },
+                'L' => {
+                    hori_ys[i][hori_len[i]] = y;
+                    hori_x1s[i][hori_len[i]] = x;
+                    x -= move.dis;
+                    hori_x0s[i][hori_len[i]] = x;
+                    hori_len[i] += 1;
+                    if (x < x0) {
+                        x0 = x;
+                    }
+                },
+                'R' => {
+                    hori_ys[i][hori_len[i]] = y;
+                    hori_x0s[i][hori_len[i]] = x;
+                    x += move.dis;
+                    hori_x1s[i][hori_len[i]] = x;
+                    hori_len[i] += 1;
+                    if (x > x1) {
+                        x1 = x;
+                    }
+                },
+                'D' => {
+                    vert_xs[i][vert_len[i]] = x;
+                    vert_y0s[i][vert_len[i]] = y;
+                    y += move.dis;
+                    vert_y1s[i][vert_len[i]] = y;
+                    vert_len[i] += 1;
+                    if (y > y1) {
+                        y1 = y;
+                    }
+                },
+                else => std.debug.assert(false),
             }
         }
     }
@@ -161,6 +182,21 @@ pub fn main() !void {
 
     std.debug.warn("cx = {}, cy = {}, w = {}, h = {}\n", cx, cy, w, h);
 
+    var prediction: u32 = w * h - 1;
+
+    // TODO prediction
+
+    std.debug.warn("\n");
+    std.debug.assert(prediction < w * h);
+    std.debug.warn("Prediction: {}.\n", prediction);
+
+    if (w > 300 or h > 200) {
+        return;
+    } else {
+        std.debug.warn("\n");
+    }
+
+    // Use the old method to confirm the result.
     var grid: []u8 = try allocator.alloc(u8, h * w);
     {
         var r: u32 = 0;
@@ -236,7 +272,7 @@ pub fn main() !void {
         vcolor += 1;
     }
 
-    if (w < 300 and h < 200) {
+    {
         var r: u32 = 0;
         while (r < h) {
             var c: u32 = 0;
@@ -250,6 +286,6 @@ pub fn main() !void {
     }
 
     std.debug.warn("\n");
-    std.debug.assert(solution < w * h);
+    std.debug.assert(solution < prediction);
     std.debug.warn("Solution: {}.\n", solution);
 }
