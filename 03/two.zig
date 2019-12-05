@@ -99,7 +99,7 @@ pub fn main() !void {
 
     var xxx: [10][1000]Move = undefined;
     var yyy: [10][]Move = undefined;
-    const snakes = try parse_snakes("03/selfcross.txt", &xxx, &yyy);
+    const snakes = try parse_snakes("03/input.txt", &xxx, &yyy);
 
     for (snakes) |snake| {
         for (snake) |move| {
@@ -146,32 +146,67 @@ pub fn main() !void {
         }
     }
 
-    var basecost: [10][1000]i32 = undefined;
+    var crect: [10][1000]Rect = undefined;
+    var ccost: [10][1000]i32 = undefined;
+    var clen = [_]usize{0} ** 10;
 
     for (snakes) |snake, i| {
-        basecost[i][0] = 0;
+        ccost[i][0] = 0;
         for (snake) |move, t| {
-            basecost[i][t + 1] = basecost[i][t] + move.dis;
-            for (snake[0..t]) |_, u| {
-                if (intersect_ab(rect[i][t], rect[i][u])) |_| {
-                    if (intersect_ab(reverse(rect[i][t]), rect[i][u])) |ec| {
-                        std.debug.warn("was {}\n", basecost[i][t + 1]);
-                        basecost[i][t + 1] = basecost[i][u] + ec;
-                        std.debug.warn("now {}\n", basecost[i][t + 1]);
+            var l = clen[i];
+            crect[i][l] = rect[i][t];
+            ccost[i][l + 1] = ccost[i][l] + move.dis;
+            var rr = rect[i][t];
+            for (crect[i][0..clen[i]]) |ss, u| {
+                if (intersect_ab(rr, ss)) |_| {
+                    if (intersect_ab(reverse(rr), ss)) |ec| {
+                        ccost[i][l + 2] = ccost[i][u] + ec;
                     } else unreachable;
+                    switch (rr.way) {
+                        'U' => {
+                            const trav = ss.t - rr.t;
+                            ccost[i][l + 1] = ccost[i][l + 2] - trav;
+                            crect[i][l].t = ss.b;
+                            rr.b = ss.b;
+                        },
+                        'L' => {
+                            const trav = ss.l - rr.l;
+                            ccost[i][l + 1] = ccost[i][l + 2] - trav;
+                            crect[i][l].l = ss.r;
+                            rr.r = ss.r;
+                        },
+                        'R' => {
+                            const trav = rr.r - ss.r;
+                            ccost[i][l + 1] = ccost[i][l + 2] - trav;
+                            crect[i][l].r = ss.l;
+                            rr.l = ss.l;
+                        },
+                        'D' => {
+                            const trav = rr.b - ss.b;
+                            ccost[i][l + 1] = ccost[i][l + 2] - trav;
+                            crect[i][l].b = ss.t;
+                            rr.t = ss.t;
+                        },
+                        else => unreachable,
+                    }
+                    crect[i][l + 1] = rr;
+                    l += 1;
                 }
             }
+            clen[i] = l + 1;
         }
+        std.debug.warn("{}\n", clen[i]);
     }
 
     var solution: i32 = sum_of_lengths;
 
     for (snakes) |snake, i| {
-        for (snake) |move, t| {
+        for (crect[i][0..clen[i]]) |crectit, t| {
             for (snakes[0..i]) |other, j| {
-                for (other) |othermove, u| {
-                    if (intersect_ab(rect[i][t], rect[j][u])) |extracost| {
-                        var x = basecost[i][t] + basecost[j][u] + extracost;
+                for (crect[j][0..clen[j]]) |crectju, u| {
+                    if (intersect_ab(crectit, crectju)) |extracost| {
+                        std.debug.warn("{} and {} intersect: {} + {} + {}\n", crectit, crectju, ccost[i][t], ccost[j][u], extracost);
+                        var x = ccost[i][t] + ccost[j][u] + extracost;
                         if (x < solution) {
                             solution = x;
                         }
