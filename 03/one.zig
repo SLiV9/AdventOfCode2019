@@ -84,8 +84,8 @@ fn paint(cell: *u8, color: u8) bool {
     }
 }
 
-fn is_intersection(aa: Rect, bb: Rect) bool {
-    return (aa.l < bb.l and bb.r < aa.r and aa.t < bb.t and bb.b < aa.b);
+fn is_intersection(hh: Rect, vv: Rect) bool {
+    return (hh.l < vv.l and vv.r < hh.r and vv.t < hh.t and hh.b < vv.b);
 }
 
 fn check_solution_i32(x: i32, y: i32, solution: *u32) void {
@@ -128,7 +128,7 @@ pub fn main() !void {
 
     var xxx: [10][1000]Move = undefined;
     var yyy: [10][]Move = undefined;
-    const snakes = try parse_snakes("03/sample1.txt", &xxx, &yyy);
+    const snakes = try parse_snakes("03/input.txt", &xxx, &yyy);
 
     for (snakes) |snake| {
         for (snake) |move| {
@@ -193,7 +193,7 @@ pub fn main() !void {
     const w = @intCast(u32, bbox.r - bbox.l + 3);
     const h = @intCast(u32, bbox.b - bbox.t + 3);
 
-    std.debug.warn("cx = {}, cy = {}, w = {}, h = {}\n", cx, cy, w, h);
+    std.debug.warn("cx = {}, cy = {}, w = {}, h = {}\n\n", cx, cy, w, h);
 
     var prediction: u32 = w * h;
 
@@ -201,9 +201,9 @@ pub fn main() !void {
         for (snake) |_, t| {
             for (snakes[0..i]) |other, j| {
                 for (other) |_, u| {
-                    if (is_vertical[i][t] and !is_vertical[j][u]) {
+                    if (!is_vertical[i][t] and is_vertical[j][u]) {
                         predict(rect[i][t], rect[j][u], &prediction);
-                    } else if (!is_vertical[i][t] and is_vertical[j][u]) {
+                    } else if (is_vertical[i][t] and !is_vertical[j][u]) {
                         predict(rect[j][u], rect[i][t], &prediction);
                     } else {
                         // We assume that parallel lines do not cross.
@@ -214,9 +214,10 @@ pub fn main() !void {
     }
 
     std.debug.warn("\n");
+    std.debug.assert(prediction < w * h);
     std.debug.warn("Prediction: {}.\n", prediction);
 
-    if ((w > 300 or h > 200) and prediction < w * h) {
+    if (w > 300 or h > 200) {
         return;
     } else {
         std.debug.warn("\n");
@@ -312,6 +313,6 @@ pub fn main() !void {
     }
 
     std.debug.warn("\n");
-    std.debug.assert(solution < prediction);
+    std.debug.assert(solution == prediction);
     std.debug.warn("Solution: {}.\n", solution);
 }
