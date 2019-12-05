@@ -128,7 +128,7 @@ pub fn main() !void {
 
     var xxx: [10][1000]Move = undefined;
     var yyy: [10][]Move = undefined;
-    const snakes = try parse_snakes("03/input.txt", &xxx, &yyy);
+    const snakes = try parse_snakes("03/selfcross.txt", &xxx, &yyy);
 
     for (snakes) |snake| {
         for (snake) |move| {
