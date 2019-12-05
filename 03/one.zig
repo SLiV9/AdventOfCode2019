@@ -7,6 +7,13 @@ const Move = struct {
     dis: i32,
 };
 
+const Rect = struct {
+    l: i32,
+    r: i32,
+    t: i32,
+    b: i32,
+};
+
 fn parse_snake(line: []u8, snake: *[1000]Move) ![]Move {
     var len: usize = 0;
 
@@ -77,6 +84,25 @@ fn paint(cell: *u8, color: u8) bool {
     }
 }
 
+fn is_intersection(aa: Rect, bb: Rect) bool {
+    return (aa.l < bb.l and bb.r < aa.r and aa.t < bb.t and bb.b < aa.b);
+}
+
+fn check_solution_i32(x: i32, y: i32, solution: *u32) void {
+    const dx = @intCast(u32, if (x >= 0) x else -x);
+    const dy = @intCast(u32, if (y >= 0) y else -y);
+    const d = dx + dy;
+    if (d < solution.*) {
+        solution.* = d;
+    }
+}
+
+fn predict(hori: Rect, verti: Rect, prediction: *u32) void {
+    if (is_intersection(hori, verti)) {
+        check_solution_i32(verti.l, hori.t, prediction);
+    }
+}
+
 fn absdiff(a: u32, b: u32) u32 {
     if (a > b) {
         return a - b;
@@ -85,7 +111,7 @@ fn absdiff(a: u32, b: u32) u32 {
     }
 }
 
-fn check(x: u32, y: u32, cx: u32, cy: u32, solution: *u32) void {
+fn check_solution(x: u32, y: u32, cx: u32, cy: u32, solution: *u32) void {
     var dx = absdiff(x, cx);
     var dy = absdiff(y, cy);
     var d = dx + dy;
@@ -111,63 +137,50 @@ pub fn main() !void {
         std.debug.warn(" ({})\n", snake.len);
     }
 
-    var hori_x0s: [10][1000]i32 = undefined;
-    var hori_x1s: [10][1000]i32 = undefined;
-    var hori_ys: [10][1000]i32 = undefined;
-    var hori_len: [10]usize = undefined;
-    var vert_y0s: [10][1000]i32 = undefined;
-    var vert_y1s: [10][1000]i32 = undefined;
-    var vert_xs: [10][1000]i32 = undefined;
-    var vert_len: [10]usize = undefined;
+    var is_vertical: [10][1000]bool = undefined;
+    var rect: [10][1000]Rect = undefined;
 
-    var x0: i32 = 0;
-    var x1: i32 = 0;
-    var y0: i32 = 0;
-    var y1: i32 = 0;
+    var bbox = Rect{ .l = 0, .r = 0, .t = 0, .b = 0 };
 
     for (snakes) |snake, i| {
         var x: i32 = 0;
         var y: i32 = 0;
-        for (snake) |move| {
+        for (snake) |move, t| {
             switch (move.way) {
                 'U' => {
-                    vert_xs[i][vert_len[i]] = x;
-                    vert_y1s[i][vert_len[i]] = y;
+                    is_vertical[i][t] = true;
+                    rect[i][t] = .{ .l = x, .r = x, .t = y, .b = y };
                     y -= move.dis;
-                    vert_y0s[i][vert_len[i]] = y;
-                    vert_len[i] += 1;
-                    if (y < y0) {
-                        y0 = y;
+                    rect[i][t].t = y;
+                    if (y < bbox.t) {
+                        bbox.t = y;
                     }
                 },
                 'L' => {
-                    hori_ys[i][hori_len[i]] = y;
-                    hori_x1s[i][hori_len[i]] = x;
+                    is_vertical[i][t] = false;
+                    rect[i][t] = .{ .l = x, .r = x, .t = y, .b = y };
                     x -= move.dis;
-                    hori_x0s[i][hori_len[i]] = x;
-                    hori_len[i] += 1;
-                    if (x < x0) {
-                        x0 = x;
+                    rect[i][t].l = x;
+                    if (x < bbox.l) {
+                        bbox.l = x;
                     }
                 },
                 'R' => {
-                    hori_ys[i][hori_len[i]] = y;
-                    hori_x0s[i][hori_len[i]] = x;
+                    is_vertical[i][t] = false;
+                    rect[i][t] = .{ .l = x, .r = x, .t = y, .b = y };
                     x += move.dis;
-                    hori_x1s[i][hori_len[i]] = x;
-                    hori_len[i] += 1;
-                    if (x > x1) {
-                        x1 = x;
+                    rect[i][t].r = x;
+                    if (x > bbox.r) {
+                        bbox.r = x;
                     }
                 },
                 'D' => {
-                    vert_xs[i][vert_len[i]] = x;
-                    vert_y0s[i][vert_len[i]] = y;
+                    is_vertical[i][t] = true;
+                    rect[i][t] = .{ .l = x, .r = x, .t = y, .b = y };
                     y += move.dis;
-                    vert_y1s[i][vert_len[i]] = y;
-                    vert_len[i] += 1;
-                    if (y > y1) {
-                        y1 = y;
+                    rect[i][t].b = y;
+                    if (y > bbox.b) {
+                        bbox.b = y;
                     }
                 },
                 else => std.debug.assert(false),
@@ -175,22 +188,35 @@ pub fn main() !void {
         }
     }
 
-    const cx = @intCast(u32, 1 - x0);
-    const cy = @intCast(u32, 1 - y0);
-    const w = @intCast(u32, x1 - x0 + 3);
-    const h = @intCast(u32, y1 - y0 + 3);
+    const cx = @intCast(u32, 1 - bbox.l);
+    const cy = @intCast(u32, 1 - bbox.t);
+    const w = @intCast(u32, bbox.r - bbox.l + 3);
+    const h = @intCast(u32, bbox.b - bbox.t + 3);
 
     std.debug.warn("cx = {}, cy = {}, w = {}, h = {}\n", cx, cy, w, h);
 
-    var prediction: u32 = w * h - 1;
+    var prediction: u32 = w * h;
 
-    // TODO prediction
+    for (snakes) |snake, i| {
+        for (snake) |_, t| {
+            for (snakes[0..i]) |other, j| {
+                for (other) |_, u| {
+                    if (is_vertical[i][t] and !is_vertical[j][u]) {
+                        predict(rect[i][t], rect[j][u], &prediction);
+                    } else if (!is_vertical[i][t] and is_vertical[j][u]) {
+                        predict(rect[j][u], rect[i][t], &prediction);
+                    } else {
+                        // We assume that parallel lines do not cross.
+                    }
+                }
+            }
+        }
+    }
 
     std.debug.warn("\n");
-    std.debug.assert(prediction < w * h);
     std.debug.warn("Prediction: {}.\n", prediction);
 
-    if (w > 300 or h > 200) {
+    if ((w > 300 or h > 200) and prediction < w * h) {
         return;
     } else {
         std.debug.warn("\n");
@@ -231,7 +257,7 @@ pub fn main() !void {
                         r -= 1;
                         var color: u8 = if (r == rr) '+' else vcolor;
                         if (paint(&grid[r * w + c], color)) {
-                            check(c, r, cx, cy, &solution);
+                            check_solution(c, r, cx, cy, &solution);
                         }
                     }
                 },
@@ -241,7 +267,7 @@ pub fn main() !void {
                         c -= 1;
                         var color: u8 = if (c == cc) '+' else hcolor;
                         if (paint(&grid[r * w + c], color)) {
-                            check(c, r, cx, cy, &solution);
+                            check_solution(c, r, cx, cy, &solution);
                         }
                     }
                 },
@@ -251,7 +277,7 @@ pub fn main() !void {
                         c += 1;
                         var color: u8 = if (c == cc) '+' else hcolor;
                         if (paint(&grid[r * w + c], color)) {
-                            check(c, r, cx, cy, &solution);
+                            check_solution(c, r, cx, cy, &solution);
                         }
                     }
                 },
@@ -261,7 +287,7 @@ pub fn main() !void {
                         r += 1;
                         var color: u8 = if (r == rr) '+' else vcolor;
                         if (paint(&grid[r * w + c], color)) {
-                            check(c, r, cx, cy, &solution);
+                            check_solution(c, r, cx, cy, &solution);
                         }
                     }
                 },
