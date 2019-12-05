@@ -158,6 +158,7 @@ pub fn main() !void {
             ccost[i][l + 1] = ccost[i][l] + move.dis;
             var rr = rect[i][t];
             for (crect[i][0..clen[i]]) |ss, u| {
+                if (true) break;
                 if (intersect_ab(rr, ss)) |_| {
                     if (intersect_ab(reverse(rr), ss)) |ec| {
                         ccost[i][l + 2] = ccost[i][u] + ec;
