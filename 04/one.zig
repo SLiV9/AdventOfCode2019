@@ -6,13 +6,13 @@ pub fn main() void {
     var n_matches: u32 = 0;
 
     // The numbers have to be non-decreasing, so the first match higher or equal
-    // to 240298 is 244499.
+    // to 240298 is 244444.
     var a: u8 = 2;
     var b: u8 = 4;
     var c: u8 = 4;
     var d: u8 = 4;
-    var e: u8 = 9;
-    var f: u8 = 9;
+    var e: u8 = 4;
+    var f: u8 = 4;
 
     all: while (a < 8) {
         while (b < 10) {
