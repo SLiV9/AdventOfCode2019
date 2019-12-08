@@ -206,35 +206,67 @@ fn execute_program(pg: []i32, pipe: *Pipe) !void {
     return ProgramError.InstructionPointerOutOfBounds;
 }
 
-fn calculate(program: []i32, amps: []i32) !i32 {
+const N_AMPS = 5;
+
+fn calculate(program: []i32, phases: []i32) !i32 {
+    std.debug.assert(phases.len == N_AMPS);
     var memory: [MAX_PG_LEN]i32 = undefined;
-    var buffer: [10]i32 = undefined;
+    var buffer: [2 * N_AMPS + 2]i32 = undefined;
     buffer[1] = 0;
-    for (amps) |phase, i| {
+    for (phases) |phase, i| {
         buffer[2 * i] = phase;
-        const last = (i + 1 < amps.len);
         var pipe = Pipe{
             .in = buffer[2 * i .. 2 * i + 2],
-            .out = if (last) buffer[2 * i + 3 .. 2 * i + 4] else buffer[0..0],
+            .out = buffer[2 * i + 3 .. 2 * i + 4],
         };
         std.mem.copy(i32, memory[0..], program);
         try execute_program(memory[0..program.len], &pipe);
     }
-    return buffer[9];
+    return buffer[buffer.len - 1];
 }
 
 fn solve(program: []i32) !i32 {
-    var amps = [_]i32{ 4, 3, 2, 1, 0 };
-    const value = try calculate(program, amps[0..]);
-    return value;
+    var phases: [N_AMPS]i32 = undefined;
+    for (phases) |_, i| {
+        phases[i] = @intCast(i32, i);
+    }
+
+    // Use Heap's algorithm to iterate through the phases.
+    var stackstate = [_]usize{0} ** phases.len;
+
+    var best = try calculate(program, phases[0..]);
+
+    var i: usize = 0;
+    while (i < phases.len) {
+        if (stackstate[i] < i) {
+            if (i % 2 == 0) {
+                std.mem.swap(i32, &phases[0], &phases[i]);
+            } else {
+                std.mem.swap(i32, &phases[stackstate[i]], &phases[i]);
+            }
+
+            var value = try calculate(program, phases[0..]);
+            if (value > best) {
+                best = value;
+            }
+
+            stackstate[i] += 1;
+            i = 0;
+        } else {
+            stackstate[i] = 0;
+            i += 1;
+        }
+    }
+
+    return best;
 }
 
 pub fn main() !void {
     var program: [MAX_PG_LEN]i32 = undefined;
-    const len: usize = try load_program(&program, "07/sample1.txt");
+    const len: usize = try load_program(&program, "07/input.txt");
 
     const solution = try solve(program[0..len]);
 
     std.debug.warn("\n");
-    std.debug.warn("Done.\n");
+    std.debug.warn("Solution: {}.\n", solution);
 }
