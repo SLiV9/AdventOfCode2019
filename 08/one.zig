@@ -32,7 +32,7 @@ fn load(fname: []const u8, layers: *[MAX_LAYERS]Layer) ![]Layer {
 }
 
 fn solve(layers: []Layer) usize {
-    var best_zerocount: usize = 0;
+    var best_zerocount: usize = LAYER_SIZE;
     var best_is_tied: bool = false;
     var best_score: usize = undefined;
 
@@ -40,10 +40,12 @@ fn solve(layers: []Layer) usize {
         var count = [_]usize{0} ** 3;
 
         for (layer) |digit| {
+            std.debug.warn("{}", digit);
             count[digit] += 1;
         }
+        std.debug.warn(" => {}x0, {}x1, {}x2\n", count[0], count[1], count[2]);
 
-        if (count[0] > best_zerocount) {
+        if (count[0] < best_zerocount) {
             best_zerocount = count[0];
             best_is_tied = false;
             best_score = count[1] * count[2];
