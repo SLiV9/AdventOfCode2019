@@ -35,6 +35,7 @@ const ProgramError = error{
     InstructionOutOfBounds,
     InstructionPointerOutOfBounds,
     ImmediateModeWrite,
+    UnknownMode,
     NoUserInput,
     InputEmpty,
     OutputFull,
@@ -98,9 +99,18 @@ fn get_userinput() !i64 {
     }
 }
 
+fn parse_mode(x: u32) !u2 {
+    if (x < 3) {
+        return @intCast(u2, x);
+    } else {
+        return ProgramError.UnknownMode;
+    }
+}
+
 const Computer = struct {
     program: []i64,
     instr_pos: usize,
+    rel_base: usize,
     heap_len: usize,
     heap_addresses: []usize,
     heap_values: []i64,
@@ -112,68 +122,75 @@ const Computer = struct {
         }
         const op: u32 = @intCast(u32, self.program[self.instr_pos]);
         const opcode = op % 100;
-        const imode = [MAX_OP_LEN]bool{
+        const mode = [MAX_OP_LEN]u2{
             undefined,
-            ((op / 100) % 10) > 0,
-            ((op / 1000) % 10) > 0,
-            ((op / 10000) % 10) > 0,
+            try parse_mode((op / 100) % 10),
+            try parse_mode((op / 1000) % 10),
+            try parse_mode((op / 10000) % 10),
         };
 
         switch (opcode) {
             1 => {
-                const x = try self.get_value(imode, 1);
-                const y = try self.get_value(imode, 2);
-                const addr = try self.get_addr(imode, 3);
+                const x = try self.get_value(mode, 1);
+                const y = try self.get_value(mode, 2);
+                const addr = try self.get_write_addr(mode, 3);
                 self.program[addr] = x + y;
                 return self.instr_pos + 4;
             },
             2 => {
-                const x = try self.get_value(imode, 1);
-                const y = try self.get_value(imode, 2);
-                const addr = try self.get_addr(imode, 3);
+                const x = try self.get_value(mode, 1);
+                const y = try self.get_value(mode, 2);
+                const addr = try self.get_write_addr(mode, 3);
                 self.program[addr] = x * y;
                 return self.instr_pos + 4;
             },
             3 => {
                 const input: i64 = try self.pipe.get_input();
-                const addr = try self.get_addr(imode, 1);
+                const addr = try self.get_write_addr(mode, 1);
                 self.program[addr] = input;
                 return self.instr_pos + 2;
             },
             4 => {
-                const x = try self.get_value(imode, 1);
+                const x = try self.get_value(mode, 1);
                 try self.pipe.output(x);
                 return self.instr_pos + 2;
             },
             5 => {
-                const x = try self.get_value(imode, 1);
+                const x = try self.get_value(mode, 1);
                 if (x != 0) {
-                    return try self.get_iaddr(imode, 2);
+                    return try self.get_jump_addr(mode, 2);
                 } else {
                     return self.instr_pos + 3;
                 }
             },
             6 => {
-                const x = try self.get_value(imode, 1);
+                const x = try self.get_value(mode, 1);
                 if (x == 0) {
-                    return try self.get_iaddr(imode, 2);
+                    return try self.get_jump_addr(mode, 2);
                 } else {
                     return self.instr_pos + 3;
                 }
             },
             7 => {
-                const x = try self.get_value(imode, 1);
-                const y = try self.get_value(imode, 2);
-                const addr = try self.get_addr(imode, 3);
+                const x = try self.get_value(mode, 1);
+                const y = try self.get_value(mode, 2);
+                const addr = try self.get_write_addr(mode, 3);
                 self.program[addr] = if (x < y) 1 else 0;
                 return self.instr_pos + 4;
             },
             8 => {
-                const x = try self.get_value(imode, 1);
-                const y = try self.get_value(imode, 2);
-                const addr = try self.get_addr(imode, 3);
+                const x = try self.get_value(mode, 1);
+                const y = try self.get_value(mode, 2);
+                const addr = try self.get_write_addr(mode, 3);
                 self.program[addr] = if (x == y) 1 else 0;
                 return self.instr_pos + 4;
+            },
+            9 => {
+                const x = try self.get_value(mode, 1);
+                const r = @intCast(i64, self.rel_base);
+                std.debug.assert(r + x >= 0);
+                self.rel_base = @intCast(usize, r + x);
+                return self.instr_pos + 2;
             },
             99 => {
                 return ProgramExit.Halt;
@@ -185,37 +202,75 @@ const Computer = struct {
         }
     }
 
-    fn get_iaddr(self: *Computer, imode: [MAX_OP_LEN]bool, x: usize) !usize {
-        const value = try self.get_value(imode, x);
+    fn get_jump_addr(self: *Computer, mode: [MAX_OP_LEN]u2, x: usize) !usize {
+        const value = try self.get_value(mode, x);
         if (value < 0) {
             return ProgramError.NegativeAddress;
         }
         return @intCast(usize, value);
     }
 
-    fn get_value(self: *Computer, imode: [MAX_OP_LEN]bool, x: usize) !i64 {
-        std.debug.assert(x > 0 and x < MAX_OP_LEN);
+    fn get_value(self: *Computer, mode: [MAX_OP_LEN]u2, x: usize) !i64 {
         if (self.instr_pos + x >= self.program.len) {
             return ProgramError.InstructionOutOfBounds;
-        } else if (imode[x]) {
-            return self.program[self.instr_pos + x];
-        } else {
-            const addr: usize = try self.get_addr(imode, x);
-            return self.program[addr];
+        }
+        const value = self.program[self.instr_pos + x];
+
+        std.debug.assert(x > 0 and x < mode.len);
+        switch (mode[x]) {
+            0 => {
+                const addr = try self.get_absolute_addr(value);
+                return self.program[addr];
+            },
+            1 => {
+                return value;
+            },
+            2 => {
+                const addr = try self.get_relative_addr(value);
+                return self.program[addr];
+            },
+            else => unreachable,
         }
     }
 
-    fn get_addr(self: *Computer, imode: [MAX_OP_LEN]bool, x: usize) !usize {
-        std.debug.assert(x > 0 and x < MAX_OP_LEN);
+    fn get_write_addr(self: *Computer, mode: [MAX_OP_LEN]u2, x: usize) !usize {
         if (self.instr_pos + x >= self.program.len) {
             return ProgramError.InstructionOutOfBounds;
-        } else if (self.program[self.instr_pos + x] < 0) {
-            return ProgramError.NegativeAddress;
-        } else if (imode[x]) {
-            return ProgramError.ImmediateModeWrite;
         }
+        const offset = self.program[self.instr_pos + x];
 
-        const addr: usize = @intCast(usize, self.program[self.instr_pos + x]);
+        std.debug.assert(x > 0 and x < mode.len);
+        switch (mode[x]) {
+            0 => {
+                return try self.get_absolute_addr(offset);
+            },
+            1 => {
+                return ProgramError.ImmediateModeWrite;
+            },
+            2 => {
+                return try self.get_relative_addr(offset);
+            },
+            else => unreachable,
+        }
+    }
+
+    fn get_absolute_addr(self: *Computer, offset: i64) !usize {
+        if (offset < 0) {
+            return ProgramError.NegativeAddress;
+        }
+        const addr: usize = @intCast(usize, offset);
+        if (addr >= self.program.len) {
+            return ProgramError.AddressOutOfBounds;
+        }
+        return addr;
+    }
+
+    fn get_relative_addr(self: *Computer, offset: i64) !usize {
+        const base = @intCast(i64, self.rel_base);
+        if (base + offset < 0) {
+            return ProgramError.NegativeAddress;
+        }
+        const addr: usize = @intCast(usize, base + offset);
         if (addr >= self.program.len) {
             return ProgramError.AddressOutOfBounds;
         }
@@ -237,7 +292,7 @@ const Computer = struct {
 
 pub fn main() !void {
     var program: [MAX_PG_LEN]i64 = undefined;
-    const len: usize = try load_program(&program, "05/input.txt");
+    const len: usize = try load_program(&program, "09/sample1.txt");
 
     var io = Pipe{
         .in_buffer = null,
@@ -248,6 +303,7 @@ pub fn main() !void {
     var computer = Computer{
         .program = program[0..len],
         .instr_pos = 0,
+        .rel_base = 0,
         .heap_len = 0,
         .heap_addresses = heap_addresses[0..],
         .heap_values = heap_values[0..],
