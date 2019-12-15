@@ -9,66 +9,56 @@ const MAX_LEN = MAX_ROWS * MAX_COLS;
 const Rock = struct {
     x: i8,
     y: i8,
-
-    // For rocks in the first segment, with angles less than 90 degrees,
-    // we sort the rocks by the non-steepness of their slope.
-    //
-    //   a < b  iff  ady/adx > bdy/bdx  (ignoring div by zero)
-    //          iff  adx/ady < bdx/bdy  (no div by zero because dy > 0)
-    //          iff  adx*bdy < bdx*bdy  (it is first iff dx is zero)
-    //
-    fn comparison_0(self: *const Rock, a: Rock, b: Rock) bool {
-        //return struct {
-        //    fn _(a: Rock, b: Rock) bool {
-        return (a.x - self.x) * (b.y - self.y) < (b.x - self.x) * (a.y - self.y);
-        //    }
-        //}._;
-    }
-
-    // For rocks in the second segment, we rotate the slopes 90 degrees
-    // counter-clockwise and sort the rocks by the non-steepness of those
-    // slopeself.
-    //
-    //   a < b  iff  adx/-ady > bdx/-bdy  (ignoring div by zero)
-    //          iff  -ady/adx < -bdy/bdx  (no div by zero because dx > 0)
-    //          iff  -ady*bdx < -bdy*adx  (it is first iff dy is zero)
-    //
-    fn comparison_1(self: *const Rock, a: Rock, b: Rock) bool {
-        //return struct {
-        //    fn _(a: Rock, b: Rock) bool {
-        return (self.y - a.y) * (b.x - self.x) < (self.y - b.y) * (a.x - self.x);
-        //    }
-        //}._;
-    }
-
-    // For rocks in the third segment, we invert the slopes and then use
-    // the same ordering as in the first segment.
-    //
-    //   a < b  iff  -adx*-bdy < -bdx*-bdy  (all d's inverted)
-    //          iff   adx* bdy >  bdx* bdy  (it is first iff dx is zero)
-    //
-    fn comparison_2(self: *const Rock, a: Rock, b: Rock) bool {
-        //return struct {
-        //    fn _(a: Rock, b: Rock) bool {
-        return (a.x - self.x) * (b.y - self.y) > (b.x - self.x) * (a.y - self.y);
-        //    }
-        //}._;
-    }
-
-    // For rocks in the last segment, with angles of 270 degrees or more,
-    // we sort by the steepness of their horizontally inverted slope.
-    //
-    //   a < b  iff  ady/-adx < bdy/-bdx  (no div by zero because dx > 0)
-    //          iff  ady*-bdx < bdy*-adx
-    //
-    fn comparison_3(self: *const Rock, a: Rock, b: Rock) bool {
-        //return struct {
-        //    fn _(a: Rock, b: Rock) bool {
-        return (a.y - self.y) * (self.x - b.x) < (b.y - self.y) * (self.x - a.x);
-        //    }
-        //}._;
-    }
 };
+
+const AngledRock = struct {
+    rock: Rock,
+    dx: i8,
+    dy: i8,
+};
+
+// For rocks in the first segment, with angles less than 90 degrees,
+// we sort the rocks by the non-steepness of their slope.
+//
+//   a < b  iff  ady/adx > bdy/bdx  (ignoring div by zero)
+//          iff  adx/ady < bdx/bdy  (no div by zero because dy > 0)
+//          iff  adx*bdy < bdx*bdy  (it is first iff dx is zero)
+//
+fn comparison_0(a: AngledRock, b: AngledRock) bool {
+    return (a.dx * b.dy) < (b.dx * a.dy);
+}
+
+// For rocks in the second segment, we rotate the slopes 90 degrees
+// counter-clockwise and sort the rocks by the non-steepness of those
+// slopeself.
+//
+//   a < b  iff  adx/-ady > bdx/-bdy  (ignoring div by zero)
+//          iff  -ady/adx < -bdy/bdx  (no div by zero because dx > 0)
+//          iff  -ady*bdx < -bdy*adx  (it is first iff dy is zero)
+//
+fn comparison_1(a: AngledRock, b: AngledRock) bool {
+    return (-a.dy * b.dx) < (-b.dy * a.dx);
+}
+
+// For rocks in the third segment, we invert the slopes and then use
+// the same ordering as in the first segment.
+//
+//   a < b  iff  -adx*-bdy < -bdx*-bdy  (all d's inverted)
+//          iff   adx* bdy >  bdx* bdy  (it is first iff dx is zero)
+//
+fn comparison_2(a: AngledRock, b: AngledRock) bool {
+    return (a.dx * b.dy) > (b.dx * a.dy);
+}
+
+// For rocks in the last segment, with angles of 270 degrees or more,
+// we sort by the steepness of their horizontally inverted slope.
+//
+//   a < b  iff  ady/-adx < bdy/-bdx  (no div by zero because dx > 0)
+//          iff  ady*-bdx < bdy*-adx
+//
+fn comparison_3(a: AngledRock, b: AngledRock) bool {
+    return (a.dy * -b.dx) < (b.dy * -a.dx);
+}
 
 fn load(fname: []const u8, list: *[MAX_LEN]Rock, w: *i8, h: *i8) ![]Rock {
     const input = try File.openRead(fname);
@@ -207,7 +197,7 @@ fn solve(rocks: []Rock) void {
     // we can do this solely based on the x-coordinate.
     // We can also do the same for the rocks with higher indices by splitting
     // then into those with an angle less than 180 and those with 180 or more.
-    var candidate_buffer: [4][MAX_LEN]Rock = undefined;
+    var candidate_buffer: [4][MAX_LEN]AngledRock = undefined;
     var segment_len = [_]u16{0} ** 4;
     for (rocks) |rock, j| {
         var segment: usize = 0;
@@ -226,7 +216,11 @@ fn solve(rocks: []Rock) void {
         } else {
             continue;
         }
-        candidate_buffer[segment][segment_len[segment]] = rock;
+        candidate_buffer[segment][segment_len[segment]] = .{
+            .rock = rock,
+            .dx = rock.x - station.x,
+            .dy = rock.y - station.y,
+        };
         segment_len[segment] += 1;
     }
     var segment: usize = 0;
@@ -239,10 +233,10 @@ fn solve(rocks: []Rock) void {
     // We will sort the remaining candidates by angle from low to high,
     // without using floating point arithmetic (because... reasons).
     switch (segment) {
-        0 => std.sort.sort(Rock, candidates, station.comparison_0),
-        1 => std.sort.sort(Rock, candidates, station.comparison_1),
-        2 => std.sort.sort(Rock, candidates, station.comparison_2),
-        3 => std.sort.sort(Rock, candidates, station.comparison_3),
+        0 => std.sort.sort(AngledRock, candidates, comparison_0),
+        1 => std.sort.sort(AngledRock, candidates, comparison_1),
+        2 => std.sort.sort(AngledRock, candidates, comparison_2),
+        3 => std.sort.sort(AngledRock, candidates, comparison_3),
         else => unreachable,
     }
 
