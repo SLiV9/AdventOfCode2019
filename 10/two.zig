@@ -13,8 +13,8 @@ const Rock = struct {
 
 const AngledRock = struct {
     rock: Rock,
-    dx: i8,
-    dy: i8,
+    dx: i16,
+    dy: i16,
 };
 
 // For rocks in the first segment, with angles less than 90 degrees,
@@ -172,15 +172,15 @@ fn solve(rocks: []Rock) void {
         const rank = count_blockers(rock, station, walls);
         ranks[j] = rank;
         while (max_rank < rank) {
-            rank_barplot[max_rank] = 0;
             max_rank += 1;
+            rank_barplot[max_rank] = 0;
         }
         rank_barplot[rank] += 1;
     }
 
     var destroyed: u16 = 0;
     var crucial_rank = determine: {
-        for (rank_barplot) |amount, rank| {
+        for (rank_barplot[0 .. max_rank + 1]) |amount, rank| {
             if (destroyed + amount >= 200) {
                 break :determine rank;
             }
@@ -203,9 +203,9 @@ fn solve(rocks: []Rock) void {
         var segment: usize = 0;
         if (j < station_i and ranks[j] == crucial_rank) {
             if (rock.x < station.x) {
-                segment = 0;
-            } else {
                 segment = 3;
+            } else {
+                segment = 0;
             }
         } else if (j > station_i and ranks[j] == crucial_rank) {
             if (rock.x > station.x) {
@@ -219,7 +219,9 @@ fn solve(rocks: []Rock) void {
         candidate_buffer[segment][segment_len[segment]] = .{
             .rock = rock,
             .dx = rock.x - station.x,
-            .dy = rock.y - station.y,
+            // A bit ugly to do this here, but the explanations behind the
+            // comparison functions assume mathematical "positive y is up".
+            .dy = station.y - rock.y,
         };
         segment_len[segment] += 1;
     }
@@ -240,7 +242,7 @@ fn solve(rocks: []Rock) void {
         else => unreachable,
     }
 
-    const index = 200 - destroyed;
+    const index = 199 - destroyed;
     std.debug.warn("The 200th destroyed asteroid is {}.\n", .{
         candidates[index],
     });
